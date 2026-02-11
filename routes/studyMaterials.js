@@ -6,10 +6,10 @@ import {
   downloadMaterial,
   verifyMaterial,
   deleteMaterial,
-  getMyUploads
+  getMyUploads,
 } from '../controllers/studyMaterialController.js';
 import { protect, authorize } from '../middleware/auth.js';
-import { uploadDocument } from '../middleware/upload.js';
+import upload from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -20,13 +20,7 @@ router.get('/:id', protect, getMaterial);
 router.get('/:id/download', protect, downloadMaterial);
 
 // Upload (Student, Faculty)
-router.post(
-  '/',
-  protect,
-  authorize('student', 'faculty'),
-  uploadDocument.single('file'),
-  uploadMaterial
-);
+router.post('/', protect, authorize('student', 'faculty'), upload.single('file'), uploadMaterial);
 
 // Verify (Faculty, Admin)
 router.put('/:id/verify', protect, authorize('faculty', 'admin'), verifyMaterial);

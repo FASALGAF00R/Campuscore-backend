@@ -4,16 +4,24 @@ import {
   getCounselingRequests,
   acceptRequest,
   sendMessage,
-  getMessages
+  getMessages,
 } from '../controllers/counselingController.js';
-import { protect, authorize } from '../middleware/auth.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/', protect, authorize('student'), createCounselingRequest);
-router.get('/', protect, authorize('counselor', 'admin'), getCounselingRequests);
-router.put('/:id/accept', protect, authorize('counselor'), acceptRequest);
-router.post('/:id/messages', protect, sendMessage);
-router.get('/:id/messages', protect, getMessages);
+// All routes require authentication
+router.use(protect);
+
+// Student routes
+router.post('/requests', createCounselingRequest);
+
+// Counselor/Admin routes
+router.get('/requests', getCounselingRequests);
+router.patch('/requests/:id/accept', acceptRequest);
+
+// Messaging routes
+router.post('/requests/:id/messages', sendMessage);
+router.get('/requests/:id/messages', getMessages);
 
 export default router;

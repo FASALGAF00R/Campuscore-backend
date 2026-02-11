@@ -1,177 +1,149 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-const userSchema = new mongoose.Schema({
-  // Basic Info
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+const userSchema = new mongoose.Schema(
+  {
+    firstName: {
+      type: String,
+      required: [true, 'First name is required'],
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      required: [true, 'Last name is required'],
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: [true, 'Email is required'],
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
+    },
+    password: {
+      type: String,
+      required: [true, 'Password is required'],
+      minlength: 6,
+      select: false,
+    },
+    role: {
+      type: String,
+      enum: ['student', 'faculty', 'admin', 'staff', 'counselor'],
+      default: 'student',
+    },
+    phone: String,
+    avatar: String,
+
+    // Student specific fields
+    studentId: String,
+    department: String,
+    semester: Number,
+    section: String,
+    cgpa: Number,
+
+    // Faculty specific fields
+    employeeId: String,
+    designation: String,
+
+    // Verification
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    isApproved: {
+      type: Boolean,
+      default: false, // Faculty needs admin approval after OTP verification
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    otpCode: String,
+    otpExpiry: Date,
+
+    // Refresh tokens
+    refreshTokens: [
+      {
+        token: String,
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
+    // Password reset
+    resetPasswordToken: String,
+    resetPasswordExpiry: Date,
+
+    lastLogin: Date,
   },
-  password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: 6,
-    select: false // Don't return password by default
-  },
-  
-  // Personal Info
-  firstName: {
-    type: String,
-    required: [true, 'First name is required'],
-    trim: true
-  },
-  lastName: {
-    type: String,
-    required: [true, 'Last name is required'],
-    trim: true
-  },
-  phone: {
-    type: String,
-    trim: true
-  },
-  avatar: {
-    type: String,
-    default: null
-  },
-  
-  // Role & Department
-  role: {
-    type: String,
-    enum: ['student', 'faculty', 'staff', 'counselor', 'admin'],
-    required: true
-  },
-  department: {
-    type: String,
-    required: function() {
-      return ['student', 'faculty'].includes(this.role);
-    }
-  },
-  
-  // Student-specific
-  studentId: {
-    type: String,
-    unique: true,
-    sparse: true, // Allows null values for non-students
-    required: function() {
-      return this.role === 'student';
-    }
-  },
-  semester: {
-    type: Number,
-    min: 1,
-    max: 8,
-    required: function() {
-      return this.role === 'student';
-    }
-  },
-  cgpa: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: null
-  },
-  
-  // Faculty-specific
-  employeeId: {
-    type: String,
-    unique: true,
-    sparse: true,
-    required: function() {
-      return ['faculty', 'staff'].includes(this.role);
-    }
-  },
-  designation: {
-    type: String,
-    required: function() {
-      return ['faculty', 'staff', 'counselor'].includes(this.role);
-    }
-  },
-  
-  // Counselor-specific
-  specialization: [{
-    type: String,
-    enum: ['mental-health', 'career', 'personal', 'academic']
-  }],
-  
-  // Verification
-  isVerified: {
-    type: Boolean,
-    default: false
-  },
-  otpCode: {
-    type: String,
-    select: false
-  },
-  otpExpiry: {
-    type: Date,
-    select: false
-  },
-  
-  // Account Status
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  
-  // Refresh Token
-  refreshToken: {
-    type: String,
-    select: false
-  },
-  
-  // Last Login
-  lastLogin: {
-    type: Date
+  {
+    timestamps: true,
   }
-}, {
-  timestamps: true
-});
-
-// Index for faster queries
-userSchema.index({ email: 1 });
-userSchema.index({ role: 1 });
-userSchema.index({ studentId: 1 });
-userSchema.index({ department: 1 });
-
-// Virtual for full name
-userSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`;
-});
+);
 
 // Hash password before saving
-userSchema.pre('save', async function() {
+userSchema.pre('save', async function () {
   if (!this.isModified('password')) {
     return;
   }
-  
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Method to compare password
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+// Compare password method
+userSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Method to generate student/employee ID
-userSchema.methods.generateId = function() {
-  if (this.role === 'student') {
-    const year = new Date().getFullYear();
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `STU${year}${random}`;
-  } else if (['faculty', 'staff'].includes(this.role)) {
-    const prefix = this.role === 'faculty' ? 'FAC' : 'STF';
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `${prefix}${random}`;
+// Static method to generate student register number
+userSchema.statics.generateStudentId = async function (department) {
+  const year = new Date().getFullYear();
+  const deptCode = department ? department.substring(0, 3).toUpperCase() : 'GEN';
+
+  // Find the last student with a similar ID format
+  const lastUser = await this.findOne({
+    role: 'student',
+    studentId: new RegExp(`^${year}${deptCode}`),
+  }).sort({ createdAt: -1 });
+
+  let sequence = '001';
+  if (lastUser && lastUser.studentId) {
+    const lastSequence = parseInt(lastUser.studentId.slice(-3));
+    sequence = String(lastSequence + 1).padStart(3, '0');
   }
+
+  return `${year}${deptCode}${sequence}`;
 };
 
-// Ensure virtuals are included in JSON
-userSchema.set('toJSON', { virtuals: true });
-userSchema.set('toObject', { virtuals: true });
+// Static method to generate faculty employee ID (Register Number)
+userSchema.statics.generateEmployeeId = async function () {
+  const year = new Date().getFullYear();
+  const prefix = 'FAC';
 
-export default mongoose.model('User', userSchema);
+  // Find the last faculty with a similar ID format
+  const lastUser = await this.findOne({
+    role: 'faculty',
+    employeeId: new RegExp(`^${year}${prefix}`),
+  }).sort({ createdAt: -1 });
+
+  let sequence = '001';
+  if (lastUser && lastUser.employeeId) {
+    const lastSequence = parseInt(lastUser.employeeId.slice(-3));
+    sequence = String(lastSequence + 1).padStart(3, '0');
+  }
+
+  return `${year}${prefix}${sequence}`;
+};
+
+// Indexes
+userSchema.index({ email: 1 });
+userSchema.index({ studentId: 1 });
+userSchema.index({ employeeId: 1 });
+userSchema.index({ role: 1, isActive: 1 });
+
+const User = mongoose.model('User', userSchema);
+
+export default User;

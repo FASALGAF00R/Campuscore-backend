@@ -1,442 +1,315 @@
 import User from '../models/User.js';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/generateToken.js';
-import { generateOTP, sendOTPEmail, sendWelcomeEmail } from '../utils/sendEmail.js';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from '../utils/generateToken.js';
+import { generateOTP, generateOTPExpiry } from '../utils/generateOTP.js';
+import transporter from '../config/email.js';
 
-/**
- * @desc    Register new user
- * @route   POST /api/auth/register
- * @access  Public
- */
+// Register User
 export const register = async (req, res) => {
   try {
-    const {
-      email,
-      password,
-      firstName,
-      lastName,
-      phone,
-      role,
-      department,
-      semester,
-      designation,
-      specialization
-    } = req.body;
+    const { firstName, lastName, email, password, role, ...otherFields } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already registered'
-      });
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
-    // Generate OTP
     const otp = generateOTP();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const otpExpiry = generateOTPExpiry();
 
-    // Create user data object
-    const userData = {
-      email,
-      password,
-      firstName,
-      lastName,
-      phone,
-      role,
-      otpCode: otp,
-      otpExpiry
-    };
+    let studentId;
+    let employeeId;
 
-    // Role-specific fields
     if (role === 'student') {
-      userData.department = department;
-      userData.semester = semester;
-      // Generate student ID before creating user
-      const year = new Date().getFullYear();
-      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      userData.studentId = `STU${year}${random}`;
+      studentId = await User.generateStudentId(req.body.department);
     } else if (role === 'faculty') {
-      userData.department = department;
-      userData.designation = designation;
-      // Generate employee ID before creating user
-      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      userData.employeeId = `FAC${random}`;
-    } else if (role === 'staff') {
-      userData.designation = designation;
-      // Generate employee ID before creating user
-      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      userData.employeeId = `STF${random}`;
-    } else if (role === 'counselor') {
-      userData.designation = designation;
-      userData.specialization = specialization;
+      employeeId = await User.generateEmployeeId();
     }
 
-    // Create user
-    const user = await User.create(userData);
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      role,
+      studentId,
+      employeeId,
+      otpCode: otp,
+      otpExpiry,
+      ...otherFields,
+    });
 
-    // Send OTP email
+    // Send email (optional/logged in dev)
+    console.log(`\n-----------------------------------------`);
+    console.log(`Verification for ${email}:`);
+    console.log(`Register Number: ${studentId || employeeId || 'N/A'}`);
+    console.log(`OTP Code: ${otp}`);
+    console.log(`-----------------------------------------\n`);
+
     try {
-      await sendOTPEmail(email, firstName, otp);
-      console.log(`✅ OTP email sent to ${email}`);
-    } catch (emailError) {
-      console.error('Failed to send OTP email:', emailError.message);
-      // In development, just log the OTP instead of failing
-      console.log('\n⚠️  EMAIL NOT CONFIGURED - Using console OTP for development');
-      console.log('━'.repeat(60));
-      console.log(`📧 Email: ${email}`);
-      console.log(`🔐 OTP Code: ${otp}`);
-      console.log(`⏰ Expires: ${new Date(otpExpiry).toLocaleString()}`);
-      console.log('━'.repeat(60));
-      console.log('💡 To enable emails, configure EMAIL_USER and EMAIL_PASSWORD in .env\n');
-      // Don't delete user - allow development testing
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: 'Welcome to Campus Core - Verify your email',
+          text: `Welcome ${firstName}! Your student register number is: ${studentId}\n\nYour OTP for verification is: ${otp}\n\nPlease use this register number to login after verification. It expires in 10 minutes.`,
+        });
+      }
+    } catch (err) {
+      console.error('Email send error:', err.message);
     }
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Please check your email for OTP.',
+      message: 'Registration successful. OTP sent to email.',
       data: {
         userId: user._id,
-        email: user.email,
-        role: user.role,
-        // Include OTP in development if email failed (remove in production)
-        ...(process.env.NODE_ENV !== 'production' && { devOTP: otp })
-      }
+        studentId: user.studentId,
+        employeeId: user.employeeId,
+      },
     });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Registration failed'
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * @desc    Verify OTP
- * @route   POST /api/auth/verify-otp
- * @access  Public
- */
+// Verify OTP
 export const verifyOTP = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { userId, email, otp } = req.body;
 
-    // Find user with OTP
-    const user = await User.findOne({ 
-      email,
-      isVerified: false
-    }).select('+otpCode +otpExpiry');
+    // Find user by userId or email
+    const user = userId ? await User.findById(userId) : await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email or user already verified'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Check if OTP is expired
-    if (user.otpExpiry < Date.now()) {
-      return res.status(400).json({
-        success: false,
-        message: 'OTP has expired. Please request a new one.',
-        code: 'OTP_EXPIRED'
-      });
+    if (user.isVerified) {
+      return res.status(400).json({ success: false, message: 'Already verified' });
     }
 
-    // Verify OTP
-    if (user.otpCode !== otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid OTP'
-      });
+    if (user.otpCode !== otp || user.otpExpiry < Date.now()) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
     }
 
-    // Mark user as verified
     user.isVerified = true;
     user.otpCode = undefined;
     user.otpExpiry = undefined;
     await user.save();
 
-    // Send welcome email
-    await sendWelcomeEmail(user.email, user.firstName, user.role);
-
-    // Generate tokens
-    const accessToken = generateAccessToken({ 
-      id: user._id, 
-      role: user.role 
-    });
-    const refreshToken = generateRefreshToken({ 
-      id: user._id 
-    });
-
-    // Save refresh token
-    user.refreshToken = refreshToken;
-    user.lastLogin = Date.now();
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Email verified successfully!',
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          department: user.department,
-          studentId: user.studentId,
-          employeeId: user.employeeId
-        },
-        accessToken,
-        refreshToken
-      }
-    });
+    res.status(200).json({ success: true, message: 'Email verified successfully' });
   } catch (error) {
-    console.error('Verify OTP error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'OTP verification failed'
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * @desc    Resend OTP
- * @route   POST /api/auth/resend-otp
- * @access  Public
- */
+// Resend OTP
 export const resendOTP = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { userId, email } = req.body;
 
-    const user = await User.findOne({ 
-      email,
-      isVerified: false
-    });
+    // Find user by userId or email
+    const user = userId ? await User.findById(userId) : await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: 'User not found or already verified'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Generate new OTP
     const otp = generateOTP();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-
     user.otpCode = otp;
-    user.otpExpiry = otpExpiry;
+    user.otpExpiry = generateOTPExpiry();
     await user.save();
 
-    // Send OTP email
+    console.log(`New OTP for ${user.email}: ${otp}`);
     try {
-      await sendOTPEmail(email, user.firstName, otp);
-      console.log(`✅ OTP resent to ${email}`);
-    } catch (emailError) {
-      console.error('Failed to resend OTP email:', emailError.message);
-      // In development, log OTP to console
-      console.log('\n⚠️  EMAIL NOT CONFIGURED - Using console OTP');
-      console.log(`📧 Email: ${email}`);
-      console.log(`🔐 OTP Code: ${otp}`);
-      console.log(`⏰ Expires: ${new Date(otpExpiry).toLocaleString()}\n`);
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: user.email,
+          subject: 'New OTP - Campus Core',
+          text: `Your new OTP is ${otp}. It expires in 10 minutes.`,
+        });
+      }
+    } catch (err) {
+      console.error('Email send error:', err.message);
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'OTP sent successfully',
-      ...(process.env.NODE_ENV !== 'production' && { devOTP: otp })
-    });
+    res.status(200).json({ success: true, message: 'OTP resent successfully' });
   } catch (error) {
-    console.error('Resend OTP error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to resend OTP'
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * @desc    Login user
- * @route   POST /api/auth/login
- * @access  Public
- */
+// Login
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body;
 
-    // Find user with password
-    const user = await User.findOne({ email }).select('+password');
+    // Find user by email, studentId, or employeeId
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { studentId: identifier }, { employeeId: identifier }],
+    }).select('+password');
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Check if verified
     if (!user.isVerified) {
-      return res.status(401).json({
-        success: false,
-        message: 'Please verify your email first',
-        code: 'EMAIL_NOT_VERIFIED'
-      });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: 'Please verify your email first',
+          data: { userId: user._id },
+        });
     }
 
-    // Check if active
     if (!user.isActive) {
-      return res.status(401).json({
+      return res.status(403).json({ success: false, message: 'Account deactivated' });
+    }
+
+    // Check if faculty is approved by admin
+    if (user.role === 'faculty' && !user.isApproved) {
+      return res.status(403).json({
         success: false,
-        message: 'Account is deactivated. Contact admin.'
+        message: 'Your account is pending admin approval. You will be notified once approved.',
+        pendingApproval: true,
+        data: { email: user.email },
       });
     }
 
-    // Verify password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
+    const accessToken = generateAccessToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id);
 
-    // Generate tokens
-    const accessToken = generateAccessToken({ 
-      id: user._id, 
-      role: user.role 
-    });
-    const refreshToken = generateRefreshToken({ 
-      id: user._id 
-    });
-
-    // Save refresh token and update last login
-    user.refreshToken = refreshToken;
+    // Store refresh token
+    user.refreshTokens.push({ token: refreshToken });
     user.lastLogin = Date.now();
     await user.save();
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
       data: {
         user: {
           id: user._id,
-          email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          fullName: user.fullName,
+          email: user.email,
           role: user.role,
-          department: user.department,
-          semester: user.semester,
-          studentId: user.studentId,
-          employeeId: user.employeeId,
-          avatar: user.avatar
         },
         accessToken,
-        refreshToken
-      }
+        refreshToken,
+      },
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed'
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * @desc    Refresh access token
- * @route   POST /api/auth/refresh-token
- * @access  Public
- */
+// Refresh Token
 export const refreshAccessToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
-
     if (!refreshToken) {
-      return res.status(401).json({
-        success: false,
-        message: 'Refresh token required'
-      });
+      return res.status(400).json({ success: false, message: 'Refresh token required' });
     }
 
-    // Verify refresh token
     const decoded = verifyRefreshToken(refreshToken);
+    const user = await User.findById(decoded.id);
 
-    // Find user
-    const user = await User.findById(decoded.id).select('+refreshToken');
-
-    if (!user || user.refreshToken !== refreshToken) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid refresh token'
-      });
+    if (!user || !user.refreshTokens.some((rt) => rt.token === refreshToken)) {
+      return res.status(401).json({ success: false, message: 'Invalid refresh token' });
     }
 
-    // Generate new access token
-    const newAccessToken = generateAccessToken({ 
-      id: user._id, 
-      role: user.role 
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        accessToken: newAccessToken
-      }
-    });
-  } catch (error) {
-    console.error('Refresh token error:', error);
-    res.status(401).json({
-      success: false,
-      message: 'Invalid or expired refresh token'
-    });
+    const accessToken = generateAccessToken(user._id, user.role);
+    res.status(200).json({ success: true, data: { accessToken } });
+  } catch {
+    res.status(401).json({ success: false, message: 'Token refresh failed' });
   }
 };
 
-/**
- * @desc    Logout user
- * @route   POST /api/auth/logout
- * @access  Private
- */
+// Logout
 export const logout = async (req, res) => {
   try {
-    // Clear refresh token from database
-    req.user.refreshToken = undefined;
-    await req.user.save();
+    const { refreshToken } = req.body;
+    const user = await User.findById(req.user._id);
 
-    res.status(200).json({
-      success: true,
-      message: 'Logout successful'
-    });
+    if (user) {
+      user.refreshTokens = user.refreshTokens.filter((rt) => rt.token !== refreshToken);
+      await user.save();
+    }
+
+    res.status(200).json({ success: true, message: 'Logged out' });
   } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Logout failed'
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * @desc    Get current user
- * @route   GET /api/auth/me
- * @access  Private
- */
+// Get Me
 export const getMe = async (req, res) => {
   try {
+    const user = await User.findById(req.user._id);
+    res.status(200).json({ success: true, data: { user } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Check Active Status
+export const checkActiveStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Account is deactivated. Please contact admin.',
+        isActive: false,
+      });
+    }
+
     res.status(200).json({
       success: true,
-      data: {
-        user: req.user
-      }
+      isActive: true,
+      message: 'Account is active',
     });
   } catch (error) {
-    console.error('Get me error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch user data'
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Check Approval Status (Public)
+export const checkApprovalStatus = async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      isApproved: user.isApproved,
+      isVerified: user.isVerified,
+      role: user.role,
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -4,16 +4,22 @@ import {
   getAllStudyPods,
   joinStudyPod,
   sendPodMessage,
-  getPodMessages
+  getPodMessages,
 } from '../controllers/studyPodController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/', protect, getAllStudyPods);
-router.post('/', protect, createStudyPod);
-router.post('/:id/join', protect, joinStudyPod);
-router.get('/:id/messages', protect, getPodMessages);
-router.post('/:id/messages', protect, sendPodMessage);
+// All routes require authentication
+router.use(protect);
+
+// Study pod routes
+router.post('/', authorize('student', 'faculty'), createStudyPod);
+router.get('/', getAllStudyPods);
+router.post('/:id/join', authorize('student', 'faculty'), joinStudyPod);
+
+// Messaging routes
+router.post('/:id/messages', sendPodMessage);
+router.get('/:id/messages', getPodMessages);
 
 export default router;

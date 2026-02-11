@@ -1,41 +1,25 @@
 import jwt from 'jsonwebtoken';
 
-/**
- * Generate JWT access token
- * @param {Object} payload - Data to encode in token
- * @returns {String} JWT token
- */
-export const generateAccessToken = (payload) => {
-  return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d'
+// Generate Access Token (short-lived)
+export const generateAccessToken = (userId, role) => {
+  return jwt.sign({ id: userId, role }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_ACCESS_EXPIRE || '15m',
   });
 };
 
-/**
- * Generate JWT refresh token
- * @param {Object} payload - Data to encode in token
- * @returns {String} JWT refresh token
- */
-export const generateRefreshToken = (payload) => {
-  return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRE || '30d'
+// Generate Refresh Token (long-lived)
+export const generateRefreshToken = (userId) => {
+  return jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
   });
 };
 
-/**
- * Verify JWT access token
- * @param {String} token - JWT token to verify
- * @returns {Object} Decoded payload
- */
+// Verify Access Token
 export const verifyAccessToken = (token) => {
   return jwt.verify(token, process.env.JWT_SECRET);
 };
 
-/**
- * Verify JWT refresh token
- * @param {String} token - JWT refresh token to verify
- * @returns {Object} Decoded payload
- */
+// Verify Refresh Token
 export const verifyRefreshToken = (token) => {
   return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 };

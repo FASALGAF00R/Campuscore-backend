@@ -1,53 +1,60 @@
 import mongoose from 'mongoose';
 
-const counselingMessageSchema = new mongoose.Schema({
-  requestId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CounselingRequest',
-    required: true
+const counselingMessageSchema = new mongoose.Schema(
+  {
+    requestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CounselingRequest',
+      required: true,
+      index: true,
+    },
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    senderRole: {
+      type: String,
+      enum: ['student', 'counselor'],
+      required: true,
+    },
+    plainContent: {
+      type: String,
+      required: function () {
+        return !this.isEncrypted;
+      },
+    },
+    encryptedContent: {
+      type: String,
+      required: function () {
+        return this.isEncrypted;
+      },
+    },
+    isEncrypted: {
+      type: Boolean,
+      default: false,
+    },
+    readAt: {
+      type: Date,
+      default: null,
+    },
   },
-  sender: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  senderRole: {
-    type: String,
-    enum: ['student', 'counselor'],
-    required: true
-  },
-  
-  // Encrypted message content (if anonymous mode)
-  encryptedContent: String,
-  
-  // Plain text message (if not anonymous)
-  plainContent: String,
-  
-  isEncrypted: {
-    type: Boolean,
-    default: false
-  },
-  
-  // Message metadata
-  isRead: {
-    type: Boolean,
-    default: false
-  },
-  readAt: Date,
-  
-  // Attachments (optional)
-  attachments: [{
-    filename: String,
-    path: String,
-    size: Number,
-    mimeType: String
-  }]
-}, {
-  timestamps: true
+  {
+    timestamps: true,
+  }
+);
+
+// Index for efficient message retrieval
+counselingMessageSchema.index({ requestId: 1, createdAt: -1 });
+
+// Pre-save hook to ensure either plain or encrypted content exists
+counselingMessageSchema.pre('save', function (next) {
+  if (!this.plainContent && !this.encryptedContent) {
+    next(new Error('Message must have either plainContent or encryptedContent'));
+  }
+  next();
 });
 
-// Indexes
-counselingMessageSchema.index({ requestId: 1, createdAt: -1 });
-counselingMessageSchema.index({ sender: 1 });
+const CounselingMessage = mongoose.model('CounselingMessage', counselingMessageSchema);
 
-export default mongoose.model('CounselingMessage', counselingMessageSchema);
+export default CounselingMessage;
