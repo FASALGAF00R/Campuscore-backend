@@ -14,16 +14,20 @@ export const createCounselingRequest = async (req, res) => {
       title,
       description, // Will be encrypted on frontend if anonymous
       isAnonymous: isAnonymous || false,
-      priority: priority || 'medium'
+      priority: priority || 'medium',
     });
 
     // Broadcast to counselors
     try {
       const io = getIO();
-      io.to('counselor').to('admin').emit('counseling:new-request', {
-        request,
-        message: isAnonymous ? 'New anonymous counseling request' : `New request from ${req.user.firstName}`
-      });
+      io.to('counselor')
+        .to('admin')
+        .emit('counseling:new-request', {
+          request,
+          message: isAnonymous
+            ? 'New anonymous counseling request'
+            : `New request from ${req.user.firstName}`,
+        });
     } catch (error) {
       console.error('Socket.IO error:', error);
     }
@@ -38,13 +42,16 @@ export const createCounselingRequest = async (req, res) => {
 export const getCounselingRequests = async (req, res) => {
   try {
     const { status, category } = req.query;
-    
+
     const filter = {};
     if (status) filter.status = status;
     if (category) filter.category = category;
 
     const requests = await CounselingRequest.find(filter)
-      .populate('student', req.user.role === 'counselor' ? 'firstName lastName email -isAnonymous' : '')
+      .populate(
+        'student',
+        req.user.role === 'counselor' ? 'firstName lastName email -isAnonymous' : ''
+      )
       .populate('counselor', 'firstName lastName')
       .sort({ createdAt: -1 });
 
@@ -74,10 +81,37 @@ export const acceptRequest = async (req, res) => {
       type: 'counseling-request',
       title: 'Counseling Request Accepted',
       message: 'Your counseling request has been accepted',
-      relatedEntity: { model: 'CounselingRequest', id: request._id }
+      relatedEntity: { model: 'CounselingRequest', id: request._id },
     });
 
     res.status(200).json({ success: true, message: 'Request accepted', data: { request } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Reject counseling request
+export const rejectRequest = async (req, res) => {
+  try {
+    const request = await CounselingRequest.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Request not found' });
+    }
+
+    request.status = 'rejected';
+    await request.save();
+
+    // Notify student
+    await Notification.create({
+      recipient: request.student,
+      type: 'counseling-request',
+      title: 'Counseling Request Rejected',
+      message: 'Your counseling request has been rejected',
+      relatedEntity: { model: 'CounselingRequest', id: request._id },
+    });
+
+    res.status(200).json({ success: true, message: 'Request rejected', data: { request } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -94,7 +128,7 @@ export const sendMessage = async (req, res) => {
       senderRole: req.user.role === 'counselor' ? 'counselor' : 'student',
       plainContent: content,
       encryptedContent,
-      isEncrypted: isEncrypted || false
+      isEncrypted: isEncrypted || false,
     });
 
     res.status(201).json({ success: true, data: { message } });

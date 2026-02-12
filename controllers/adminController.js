@@ -119,14 +119,23 @@ export const adminLoginRequest = async (req, res) => {
         console.log(`\n[SYSTEM] Created initial Admin: ${systemAdminEmail}`);
       }
     } else {
-      // Standard check for other admins in DB
+      // Check for Admin, Counselor, or Staff in DB
       user = await User.findOne({
         $or: [{ email: identifier }, { employeeId: identifier }],
-        role: 'admin',
+        role: { $in: ['admin', 'counselor', 'staff'] },
       }).select('+password');
 
       if (!user || !(await user.comparePassword(password))) {
-        return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
+
+      if (!user.isActive) {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            message: 'Your account is deactivated. Please contact the administrator.',
+          });
       }
     }
 

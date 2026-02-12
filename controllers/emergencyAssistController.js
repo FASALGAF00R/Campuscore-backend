@@ -105,6 +105,21 @@ export const updateRequestStatus = async (req, res) => {
   }
 };
 
+// Reject emergency assist request
+export const rejectRequest = async (req, res) => {
+  try {
+    const request = await EmergencyAssist.findByIdAndUpdate(
+      req.params.id,
+      { status: 'cancelled' },
+      { new: true }
+    );
+    if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
+    res.status(200).json({ success: true, message: 'Request cancelled', data: { request } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Add message
 export const addMessage = async (req, res) => {
   try {

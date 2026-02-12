@@ -5,6 +5,7 @@ import {
   acceptRequest,
   sendMessage,
   getMessages,
+  rejectRequest,
 } from '../controllers/counselingController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -19,6 +20,7 @@ router.post('/requests', createCounselingRequest);
 // Counselor/Admin routes
 router.get('/requests', getCounselingRequests);
 router.patch('/requests/:id/accept', acceptRequest);
+router.patch('/requests/:id/reject', rejectRequest);
 
 // Messaging routes
 router.post('/requests/:id/messages', sendMessage);

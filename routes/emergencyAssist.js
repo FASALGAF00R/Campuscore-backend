@@ -8,7 +8,8 @@ import {
   assignRequest,
   updateRequestStatus,
   addMessage,
-  rateAssistance
+  rateAssistance,
+  rejectRequest,
 } from '../controllers/emergencyAssistController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -27,6 +28,7 @@ router.get('/', protect, authorize('staff', 'admin'), getAllRequests);
 router.get('/:id', protect, getRequest);
 router.put('/:id/assign', protect, authorize('staff', 'admin'), assignRequest);
 router.put('/:id/status', protect, authorize('staff', 'admin'), updateRequestStatus);
+router.put('/:id/reject', protect, authorize('staff', 'admin'), rejectRequest);
 
 // Shared routes (student + assigned staff)
 router.post('/:id/message', protect, addMessage);

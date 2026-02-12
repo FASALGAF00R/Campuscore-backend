@@ -24,11 +24,11 @@ router.post('/login-request', adminLoginRequest);
 router.post('/verify-otp', verifyAdminOTP);
 
 // Protected admin routes
-router.get('/students', protect, authorize('admin'), getAllStudents);
-router.get('/teachers', protect, authorize('admin'), getAllTeachers);
+router.get('/students', protect, authorize('admin', 'counselor', 'staff'), getAllStudents);
+router.get('/teachers', protect, authorize('admin', 'counselor', 'staff'), getAllTeachers);
 router.get('/counselors', protect, authorize('admin'), getAllCounselors);
 router.get('/staff', protect, authorize('admin'), getAllStaff);
-router.get('/sos', protect, authorize('admin'), getAllSOSAlerts);
+router.get('/sos', protect, authorize('admin', 'counselor', 'staff'), getAllSOSAlerts);
 router.get('/events', protect, authorize('admin'), getAllEvents);
 
 // Faculty approval routes
