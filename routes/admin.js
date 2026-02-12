@@ -12,6 +12,8 @@ import {
   getPendingFaculty,
   approveFaculty,
   rejectFaculty,
+  createCounselor,
+  createStaff,
 } from '../controllers/adminController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -33,6 +35,12 @@ router.get('/events', protect, authorize('admin'), getAllEvents);
 router.get('/pending-faculty', protect, authorize('admin'), getPendingFaculty);
 router.post('/approve-faculty/:id', protect, authorize('admin'), approveFaculty);
 router.post('/reject-faculty/:id', protect, authorize('admin'), rejectFaculty);
+
+// Counselor creation
+router.post('/create-counselor', protect, authorize('admin'), createCounselor);
+
+// Staff creation
+router.post('/create-staff', protect, authorize('admin'), createStaff);
 
 router.patch('/users/:id/toggle-status', protect, authorize('admin'), toggleUserStatus);
 

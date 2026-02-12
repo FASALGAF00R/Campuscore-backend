@@ -299,3 +299,98 @@ export const rejectFaculty = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Create Counselor
+export const createCounselor = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      specialization,
+      phone,
+      experience,
+      qualification,
+      bio,
+      maxStudentsPerDay,
+      counselingMode,
+      availability,
+      isActive,
+    } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    }
+
+    const counselor = new User({
+      firstName,
+      lastName,
+      email,
+      password,
+      role: 'counselor',
+      specialization,
+      phone,
+      experience,
+      qualification,
+      bio,
+      maxStudentsPerDay,
+      counselingMode,
+      availability,
+      isActive: isActive !== undefined ? isActive : true,
+      isVerified: true, // Admin created accounts are verified by default
+      isApproved: true, // Admin created accounts are approved by default
+    });
+
+    await counselor.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Counselor created successfully',
+      data: counselor,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Create Staff
+export const createStaff = async (req, res) => {
+  try {
+    const { firstName, lastName, email, password, category, phone, bio, availability, isActive } =
+      req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    }
+
+    const staff = new User({
+      firstName,
+      lastName,
+      email,
+      password,
+      role: 'staff',
+      category,
+      phone,
+      bio,
+      availability,
+      isActive: isActive !== undefined ? isActive : true,
+      isVerified: true,
+      isApproved: true,
+    });
+
+    await staff.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Staff member created successfully',
+      data: staff,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

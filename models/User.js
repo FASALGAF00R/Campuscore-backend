@@ -45,6 +45,37 @@ const userSchema = new mongoose.Schema(
     employeeId: String,
     designation: String,
 
+    // Counselor specific fields
+    specialization: {
+      type: String,
+      enum: [
+        'Academic Issues',
+        'Career Guidance',
+        'Mental Health',
+        'Placement Support',
+        'Personal Issues',
+      ],
+    },
+    experience: Number, // Years of Experience
+    qualification: String,
+    bio: String, // Short Bio / About
+    maxStudentsPerDay: {
+      type: Number,
+      default: 5,
+    },
+    counselingMode: {
+      type: String,
+      enum: ['In-Person', 'Online', 'Both'],
+      default: 'Both',
+    },
+    availability: String, // e.g., "Mon-Fri, 9AM-5PM"
+
+    // Staff specific fields
+    category: {
+      type: String,
+      enum: ['Office', 'Security', 'Maintenance', 'Help Desk', 'Transport', 'Other'],
+    },
+
     // Verification
     isVerified: {
       type: Boolean,
