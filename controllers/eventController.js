@@ -1,18 +1,25 @@
 import Event from '../models/Event.js';
-import Notification from '../models/Notification.js';
-import { getIO } from '../config/socket.js';
 
 // Create event
 export const createEvent = async (req, res) => {
   try {
     const eventData = { ...req.body, organizer: req.user._id };
+
+    if (req.file) {
+      eventData.image = `/uploads/events/${req.file.filename}`;
+    }
+
+    if (req.body.maxParticipants) {
+      eventData.maxParticipants = parseInt(req.body.maxParticipants);
+    }
+
     const event = await Event.create(eventData);
     await event.populate('organizer', 'firstName lastName email');
 
     res.status(201).json({
       success: true,
       message: 'Event created successfully',
-      data: { event }
+      data: { event },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -23,7 +30,7 @@ export const createEvent = async (req, res) => {
 export const getAllEvents = async (req, res) => {
   try {
     const { status, category, department, page = 1, limit = 20 } = req.query;
-    
+
     const filter = {};
     if (status) filter.status = status;
     if (category) filter.category = category;
@@ -41,8 +48,8 @@ export const getAllEvents = async (req, res) => {
       success: true,
       data: {
         events,
-        pagination: { total, page: parseInt(page), pages: Math.ceil(total / limit) }
-      }
+        pagination: { total, page: parseInt(page), pages: Math.ceil(total / limit) },
+      },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -69,11 +76,20 @@ export const getEvent = async (req, res) => {
 // Update event
 export const updateEvent = async (req, res) => {
   try {
-    const event = await Event.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const updateData = { ...req.body };
+
+    if (req.file) {
+      updateData.image = `/uploads/events/${req.file.filename}`;
+    }
+
+    if (req.body.maxParticipants) {
+      updateData.maxParticipants = parseInt(req.body.maxParticipants);
+    }
+
+    const event = await Event.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!event) {
       return res.status(404).json({ success: false, message: 'Event not found' });
@@ -88,11 +104,20 @@ export const updateEvent = async (req, res) => {
 // Delete event
 export const deleteEvent = async (req, res) => {
   try {
-    const event = await Event.findByIdAndDelete(req.params.id);
+    const event = await Event.findById(req.params.id);
 
     if (!event) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
+
+    // Check ownership/permissions
+    if (req.user.role !== 'admin' && event.organizer.toString() !== req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ success: false, message: 'Not authorized to delete this event' });
+    }
+
+    await Event.findByIdAndDelete(req.params.id);
 
     res.status(200).json({ success: true, message: 'Event deleted' });
   } catch (error) {
@@ -136,7 +161,7 @@ export const unregisterFromEvent = async (req, res) => {
     }
 
     event.registeredParticipants = event.registeredParticipants.filter(
-      id => id.toString() !== req.user._id.toString()
+      (id) => id.toString() !== req.user._id.toString()
     );
     await event.save();
 
@@ -151,7 +176,7 @@ export const getUpcomingEvents = async (req, res) => {
   try {
     const events = await Event.find({
       status: 'published',
-      startDate: { $gte: new Date() }
+      startDate: { $gte: new Date() },
     })
       .populate('organizer', 'firstName lastName')
       .sort({ startDate: 1 })

@@ -8,14 +8,14 @@ export const initializeSocket = (server) => {
     cors: {
       origin: process.env.FRONTEND_URL || 'http://localhost:5173',
       methods: ['GET', 'POST'],
-      credentials: true
-    }
+      credentials: true,
+    },
   });
 
   // Authentication middleware for Socket.IO
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
-    
+
     if (!token) {
       return next(new Error('Authentication token missing'));
     }
@@ -25,7 +25,7 @@ export const initializeSocket = (server) => {
       socket.userId = decoded.id;
       socket.userRole = decoded.role;
       next();
-    } catch (error) {
+    } catch {
       next(new Error('Invalid authentication token'));
     }
   });
@@ -36,7 +36,7 @@ export const initializeSocket = (server) => {
 
     // Join role-specific room
     socket.join(socket.userRole);
-    
+
     // Join user-specific room
     socket.join(`user:${socket.userId}`);
 
@@ -68,13 +68,13 @@ export const initializeSocket = (server) => {
     // Typing indicators
     socket.on('typing:start', (data) => {
       io.to(`user:${data.recipientId}`).emit('typing:start', {
-        userId: socket.userId
+        userId: socket.userId,
       });
     });
 
     socket.on('typing:stop', (data) => {
       io.to(`user:${data.recipientId}`).emit('typing:stop', {
-        userId: socket.userId
+        userId: socket.userId,
       });
     });
 

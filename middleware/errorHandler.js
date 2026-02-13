@@ -2,6 +2,7 @@
  * Global error handler middleware
  */
 export const errorHandler = (err, req, res, next) => {
+  // eslint-disable-line no-unused-vars
   let error = { ...err };
   error.message = err.message;
 
@@ -23,7 +24,9 @@ export const errorHandler = (err, req, res, next) => {
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors).map(val => val.message).join(', ');
+    const message = Object.values(err.errors)
+      .map((val) => val.message)
+      .join(', ');
     error = { message, statusCode: 400 };
   }
 
@@ -39,7 +42,7 @@ export const errorHandler = (err, req, res, next) => {
   res.status(error.statusCode || 500).json({
     success: false,
     message: error.message || 'Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 
@@ -47,8 +50,9 @@ export const errorHandler = (err, req, res, next) => {
  * Handle 404 - Not Found
  */
 export const notFound = (req, res, next) => {
+  // eslint-disable-line no-unused-vars
   res.status(404).json({
     success: false,
-    message: `Route ${req.originalUrl} not found`
+    message: `Route ${req.originalUrl} not found`,
   });
 };

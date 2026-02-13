@@ -42,6 +42,7 @@ app.use(cors(corsOptions));
 // Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // Test route
 app.get('/', (req, res) => {

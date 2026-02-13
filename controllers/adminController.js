@@ -1,14 +1,70 @@
 import User from '../models/User.js';
 import Event from '../models/Event.js';
 import SOSAlert from '../models/SOSAlert.js';
+import CounselingRequest from '../models/CounselingRequest.js';
+import EmergencyAssist from '../models/EmergencyAssist.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.js';
+
+// Get system statistics for dashboard
+export const getSystemStats = async (req, res) => {
+  try {
+    const studentCount = await User.countDocuments({ role: 'student' });
+    const teacherCount = await User.countDocuments({ role: 'faculty' });
+    const counselorCount = await User.countDocuments({ role: 'counselor' });
+    const staffCount = await User.countDocuments({ role: 'staff' });
+    const pendingFacultyCount = await User.countDocuments({ role: 'faculty', isApproved: false });
+
+    const activeSOSCount = await SOSAlert.countDocuments({ status: 'active' });
+    const pendingCounselingCount = await CounselingRequest.countDocuments({ status: 'pending' });
+    const pendingHelpCount = await EmergencyAssist.countDocuments({ status: 'pending' });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        users: {
+          students: studentCount,
+          teachers: teacherCount,
+          counselors: counselorCount,
+          staff: staffCount,
+          pendingFaculty: pendingFacultyCount,
+        },
+        requests: {
+          sos: activeSOSCount,
+          counseling: pendingCounselingCount,
+          help: pendingHelpCount,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 // Get all students
 export const getAllStudents = async (req, res) => {
   try {
-    const students = await User.find({ role: 'student' }).sort({ createdAt: -1 });
+    let query = { role: 'student' };
+
+    // If faculty is requesting, only show students from their department
+    if (req.user.role === 'faculty') {
+      if (!req.user.department) {
+        console.warn(
+          `[WARN] Faculty ${req.user.email} (ID: ${req.user._id}) has NO department set in DB.`
+        );
+        return res
+          .status(403)
+          .json({ success: false, message: 'Faculty department not identified' });
+      }
+      const dept = req.user.department.trim();
+      query.department = { $regex: new RegExp(`^${dept}$`, 'i') };
+      console.log(`[QUERY] Faculty Dept: "${dept}"`);
+    }
+
+    const students = await User.find(query).sort({ createdAt: -1 });
+    console.log(`[RESULT] Found ${students.length} students for query:`, JSON.stringify(query));
     res.status(200).json({ success: true, data: students });
   } catch (error) {
+    console.error('[CRITICAL] getAllStudents error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -130,12 +186,10 @@ export const adminLoginRequest = async (req, res) => {
       }
 
       if (!user.isActive) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: 'Your account is deactivated. Please contact the administrator.',
-          });
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is deactivated. Please contact the administrator.',
+        });
       }
     }
 

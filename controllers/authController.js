@@ -159,13 +159,11 @@ export const login = async (req, res) => {
     }
 
     if (!user.isVerified) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: 'Please verify your email first',
-          data: { userId: user._id },
-        });
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email first',
+        data: { userId: user._id },
+      });
     }
 
     if (!user.isActive) {
@@ -199,6 +197,7 @@ export const login = async (req, res) => {
           lastName: user.lastName,
           email: user.email,
           role: user.role,
+          department: user.department,
         },
         accessToken,
         refreshToken,

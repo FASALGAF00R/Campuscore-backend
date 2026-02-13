@@ -1,11 +1,6 @@
 import StudyMaterial from '../models/StudyMaterial.js';
 import Notification from '../models/Notification.js';
-import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * @desc    Upload study material
@@ -17,7 +12,7 @@ export const uploadMaterial = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No file uploaded'
+        message: 'No file uploaded',
       });
     }
 
@@ -30,7 +25,7 @@ export const uploadMaterial = async (req, res) => {
       department,
       semester,
       category,
-      tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
+      tags: tags ? tags.split(',').map((tag) => tag.trim()) : [],
       uploadedBy: req.user._id,
       uploaderRole: req.user.role,
       file: {
@@ -38,8 +33,8 @@ export const uploadMaterial = async (req, res) => {
         originalName: req.file.originalname,
         path: req.file.path,
         size: req.file.size,
-        mimetype: req.file.mimetype
-      }
+        mimetype: req.file.mimetype,
+      },
     });
 
     await material.populate('uploadedBy', 'firstName lastName email role');
@@ -47,7 +42,7 @@ export const uploadMaterial = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Study material uploaded successfully',
-      data: { material }
+      data: { material },
     });
   } catch (error) {
     console.error('Upload material error:', error);
@@ -57,7 +52,7 @@ export const uploadMaterial = async (req, res) => {
     }
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to upload material'
+      message: error.message || 'Failed to upload material',
     });
   }
 };
@@ -69,15 +64,7 @@ export const uploadMaterial = async (req, res) => {
  */
 export const getAllMaterials = async (req, res) => {
   try {
-    const {
-      department,
-      semester,
-      subject,
-      category,
-      isVerified,
-      page = 1,
-      limit = 20
-    } = req.query;
+    const { department, semester, subject, category, isVerified, page = 1, limit = 20 } = req.query;
 
     const filter = {};
     if (department) filter.department = department;
@@ -102,15 +89,15 @@ export const getAllMaterials = async (req, res) => {
         pagination: {
           total,
           page: parseInt(page),
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
     console.error('Get materials error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch materials'
+      message: 'Failed to fetch materials',
     });
   }
 };
@@ -129,19 +116,19 @@ export const getMaterial = async (req, res) => {
     if (!material) {
       return res.status(404).json({
         success: false,
-        message: 'Material not found'
+        message: 'Material not found',
       });
     }
 
     res.status(200).json({
       success: true,
-      data: { material }
+      data: { material },
     });
   } catch (error) {
     console.error('Get material error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch material'
+      message: 'Failed to fetch material',
     });
   }
 };
@@ -158,7 +145,7 @@ export const downloadMaterial = async (req, res) => {
     if (!material) {
       return res.status(404).json({
         success: false,
-        message: 'Material not found'
+        message: 'Material not found',
       });
     }
 
@@ -166,7 +153,7 @@ export const downloadMaterial = async (req, res) => {
     if (!fs.existsSync(material.file.path)) {
       return res.status(404).json({
         success: false,
-        message: 'File not found on server'
+        message: 'File not found on server',
       });
     }
 
@@ -180,7 +167,7 @@ export const downloadMaterial = async (req, res) => {
     console.error('Download material error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to download material'
+      message: 'Failed to download material',
     });
   }
 };
@@ -197,7 +184,7 @@ export const verifyMaterial = async (req, res) => {
     if (!material) {
       return res.status(404).json({
         success: false,
-        message: 'Material not found'
+        message: 'Material not found',
       });
     }
 
@@ -216,20 +203,20 @@ export const verifyMaterial = async (req, res) => {
       message: `Your material "${material.title}" has been verified`,
       relatedEntity: {
         model: 'StudyMaterial',
-        id: material._id
-      }
+        id: material._id,
+      },
     });
 
     res.status(200).json({
       success: true,
       message: 'Material verified successfully',
-      data: { material }
+      data: { material },
     });
   } catch (error) {
     console.error('Verify material error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to verify material'
+      message: 'Failed to verify material',
     });
   }
 };
@@ -246,7 +233,7 @@ export const deleteMaterial = async (req, res) => {
     if (!material) {
       return res.status(404).json({
         success: false,
-        message: 'Material not found'
+        message: 'Material not found',
       });
     }
 
@@ -257,7 +244,7 @@ export const deleteMaterial = async (req, res) => {
     if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to delete this material'
+        message: 'Not authorized to delete this material',
       });
     }
 
@@ -270,13 +257,13 @@ export const deleteMaterial = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Material deleted successfully'
+      message: 'Material deleted successfully',
     });
   } catch (error) {
     console.error('Delete material error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete material'
+      message: 'Failed to delete material',
     });
   }
 };
@@ -294,13 +281,13 @@ export const getMyUploads = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { materials }
+      data: { materials },
     });
   } catch (error) {
     console.error('Get my uploads error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch your materials'
+      message: 'Failed to fetch your materials',
     });
   }
 };
