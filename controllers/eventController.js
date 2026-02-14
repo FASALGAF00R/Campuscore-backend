@@ -134,7 +134,7 @@ export const registerForEvent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    if (event.registeredParticipants.includes(req.user._id)) {
+    if (event.registeredParticipants.some((id) => id.toString() === req.user._id.toString())) {
       return res.status(400).json({ success: false, message: 'Already registered' });
     }
 

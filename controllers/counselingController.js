@@ -1,6 +1,7 @@
 import CounselingRequest from '../models/CounselingRequest.js';
 import CounselingMessage from '../models/CounselingMessage.js';
 import Notification from '../models/Notification.js';
+import User from '../models/User.js';
 import { getIO } from '../config/socket.js';
 
 // Create counseling request
@@ -145,6 +146,26 @@ export const getMessages = async (req, res) => {
       .sort({ createdAt: 1 });
 
     res.status(200).json({ success: true, data: { messages } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get public list of counselors
+export const getPublicCounselors = async (req, res) => {
+  try {
+    const counselors = await User.find({
+      role: 'counselor',
+      isActive: true, // Only active
+      isVerified: true,
+      isApproved: true,
+    })
+      .select(
+        'firstName lastName email qualification specialization experience bio availability counselingMode maxStudentsPerDay'
+      )
+      .sort({ firstName: 1 });
+
+    res.status(200).json({ success: true, data: { counselors } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

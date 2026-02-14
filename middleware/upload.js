@@ -3,7 +3,12 @@ import path from 'path';
 import fs from 'fs';
 
 // Ensure directories exist
-const folders = ['uploads/events', 'uploads/materials', 'uploads/profiles'];
+const folders = [
+  'uploads/events',
+  'uploads/materials',
+  'uploads/profiles',
+  'uploads/help-requests',
+];
 folders.forEach((folder) => {
   if (!fs.existsSync(folder)) {
     fs.mkdirSync(folder, { recursive: true });
@@ -18,6 +23,10 @@ const genericStorage = multer.diskStorage({
       cb(null, 'uploads/events');
     } else if (req.originalUrl.includes('/study-materials')) {
       cb(null, 'uploads/materials');
+    } else if (req.originalUrl.includes('/auth') || file.fieldname === 'avatar') {
+      cb(null, 'uploads/profiles');
+    } else if (req.originalUrl.includes('/help-requests')) {
+      cb(null, 'uploads/help-requests');
     } else {
       cb(null, 'uploads');
     }

@@ -9,8 +9,10 @@ import {
   getMe,
   checkActiveStatus,
   checkApprovalStatus,
+  updateProfile,
 } from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
+import upload from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -25,6 +27,7 @@ router.post('/refresh-token', refreshAccessToken);
 // Protected routes
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
+router.put('/profile', protect, upload.single('avatar'), updateProfile);
 router.get('/check-status', protect, checkActiveStatus);
 
 export default router;

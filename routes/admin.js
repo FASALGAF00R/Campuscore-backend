@@ -16,6 +16,10 @@ import {
   createStaff,
   getSystemStats,
 } from '../controllers/adminController.js';
+import {
+  getMyRequests as getAllHelpRequests,
+  updateRequestStatus,
+} from '../controllers/helpRequestController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -50,5 +54,14 @@ router.post('/create-counselor', protect, authorize('admin'), createCounselor);
 router.post('/create-staff', protect, authorize('admin'), createStaff);
 
 router.patch('/users/:id/toggle-status', protect, authorize('admin'), toggleUserStatus);
+
+// Help Requests Management
+router.get('/help-requests', protect, authorize('admin', 'staff'), getAllHelpRequests);
+router.patch(
+  '/help-requests/:id/status',
+  protect,
+  authorize('admin', 'staff'),
+  updateRequestStatus
+);
 
 export default router;

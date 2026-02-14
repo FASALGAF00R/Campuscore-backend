@@ -311,4 +311,52 @@ export const checkApprovalStatus = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
+}; // Update Profile
+export const updateProfile = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      phone,
+      department,
+      semester,
+      section,
+      bio,
+      qualification,
+      experience,
+      specialization,
+    } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Update fields if provided
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (phone) user.phone = phone;
+    if (department) user.department = department;
+    if (semester) user.semester = semester;
+    if (section) user.section = section;
+    if (bio) user.bio = bio;
+    if (qualification) user.qualification = qualification;
+    if (experience) user.experience = experience;
+    if (specialization) user.specialization = specialization;
+
+    // Handle avatar upload
+    if (req.file) {
+      user.avatar = `/uploads/profiles/${req.file.filename}`;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: { user },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };

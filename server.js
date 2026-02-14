@@ -1,5 +1,6 @@
 // entry file
 import express from 'express';
+console.log('--- SERVER RESTARTING ---');
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { createServer } from 'http';
@@ -18,6 +19,8 @@ import studyPodRoutes from './routes/studyPods.js';
 import timetableRoutes from './routes/timetables.js';
 import studyMaterialRoutes from './routes/studyMaterials.js';
 import adminRoutes from './routes/admin.js';
+import staffRoutes from './routes/staff.js';
+import helpRequestRoutes from './routes/helpRequest.js';
 
 // Load environment variables
 dotenv.config();
@@ -64,6 +67,8 @@ app.use('/api/study-pods', studyPodRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/help-requests', helpRequestRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

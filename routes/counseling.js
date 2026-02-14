@@ -6,6 +6,7 @@ import {
   sendMessage,
   getMessages,
   rejectRequest,
+  getPublicCounselors,
 } from '../controllers/counselingController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -13,6 +14,9 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(protect);
+
+// Public/Student routes to view active counselors
+router.get('/counselors', getPublicCounselors);
 
 // Student routes
 router.post('/requests', createCounselingRequest);
