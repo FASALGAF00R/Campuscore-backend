@@ -53,7 +53,7 @@ export const getRequest = async (req, res) => {
 // Get my requests
 export const getMyRequests = async (req, res) => {
   try {
-    const requests = await EmergencyAssist.find({ student: req.user._id }).sort({ createdAt: -1 });
+    const requests = await EmergencyAssist.find({ student: req.user._id }).sort({ createdAt: 1 });
     res.status(200).json({ success: true, data: { requests } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
