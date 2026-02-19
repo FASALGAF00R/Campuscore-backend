@@ -32,7 +32,7 @@ export const initializeSocket = (server) => {
 
   // Connection handler
   io.on('connection', (socket) => {
-    console.log(`✅ User connected: ${socket.userId} (Role: ${socket.userRole})`);
+    console.log(` User connected: ${socket.userId} (Role: ${socket.userRole})`);
 
     // Join role-specific room
     socket.join(socket.userRole);
@@ -42,7 +42,7 @@ export const initializeSocket = (server) => {
 
     // Handle disconnection
     socket.on('disconnect', () => {
-      console.log(`❌ User disconnected: ${socket.userId}`);
+      console.log(` User disconnected: ${socket.userId}`);
     });
 
     // SOS Alert - Broadcast to faculty and admin
@@ -93,7 +93,7 @@ export const initializeSocket = (server) => {
     });
   });
 
-  console.log('✅ Socket.IO initialized');
+  console.log(' Socket.IO initialized');
   return io;
 };
 

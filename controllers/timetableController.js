@@ -3,7 +3,33 @@ import Timetable from '../models/Timetable.js';
 // Create timetable
 export const createTimetable = async (req, res) => {
   try {
-    const timetable = await Timetable.create(req.body);
+    const timetableData = {
+      ...req.body,
+      createdBy: req.user._id,
+      academicYear:
+        req.body.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+    };
+
+    // Check if a timetable already exists for this dept/sem/section
+    const existing = await Timetable.findOne({
+      department: req.body.department,
+      semester: req.body.semester,
+      section: req.body.section || 'A',
+      isActive: true,
+    });
+
+    if (existing) {
+      const updated = await Timetable.findByIdAndUpdate(existing._id, timetableData, { new: true });
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message: 'Timetable updated successfully',
+          data: { timetable: updated },
+        });
+    }
+
+    const timetable = await Timetable.create(timetableData);
     res.status(201).json({ success: true, data: { timetable } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -16,7 +42,6 @@ export const getMyTimetable = async (req, res) => {
     const timetable = await Timetable.findOne({
       department: req.user.department,
       semester: req.user.semester,
-      section: req.user.section,
     });
     res.status(200).json({ success: true, data: { timetable } });
   } catch (error) {
@@ -31,7 +56,6 @@ export const getTodayClasses = async (req, res) => {
     const timetable = await Timetable.findOne({
       department: req.user.department,
       semester: req.user.semester,
-      section: req.user.section,
     });
 
     const todayClasses = timetable ? timetable.schedule.filter((s) => s.day === day) : [];
@@ -74,7 +98,11 @@ export const deleteTimetable = async (req, res) => {
 // Get all timetables
 export const getAllTimetables = async (req, res) => {
   try {
-    const timetables = await Timetable.find();
+    const query = {};
+    if (req.user.role === 'faculty' && req.user.department) {
+      query.department = req.user.department;
+    }
+    const timetables = await Timetable.find(query);
     res.status(200).json({ success: true, data: { timetables } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

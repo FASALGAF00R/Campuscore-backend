@@ -1,8 +1,7 @@
 /**
  * Global error handler middleware
  */
-export const errorHandler = (err, req, res, next) => {
-  // eslint-disable-line no-unused-vars
+export const errorHandler = (err, req, res, _next) => {
   let error = { ...err };
   error.message = err.message;
 
@@ -49,8 +48,7 @@ export const errorHandler = (err, req, res, next) => {
 /**
  * Handle 404 - Not Found
  */
-export const notFound = (req, res, next) => {
-  // eslint-disable-line no-unused-vars
+export const notFound = (req, res, _next) => {
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`,

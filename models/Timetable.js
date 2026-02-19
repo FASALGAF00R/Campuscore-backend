@@ -1,68 +1,84 @@
 import mongoose from 'mongoose';
 
-const timetableSchema = new mongoose.Schema({
-  student: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  department: {
-    type: String,
-    required: true
-  },
-  semester: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 8
-  },
-  academicYear: {
-    type: String,
-    required: true // e.g., "2024-2025"
-  },
-  
-  // Weekly schedule
-  schedule: [{
-    day: {
-      type: String,
-      enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-      required: true
+const timetableSchema = new mongoose.Schema(
+  {
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
-    periods: [{
-      subject: {
-        type: String,
-        required: true
+    department: {
+      type: String,
+      required: true,
+    },
+    semester: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 8,
+    },
+    section: {
+      type: String,
+      default: 'A',
+    },
+    academicYear: {
+      type: String,
+      required: true, // e.g., "2024-2025"
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+
+    // Weekly schedule
+    schedule: [
+      {
+        day: {
+          type: String,
+          enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+          required: true,
+        },
+        periods: [
+          {
+            subject: {
+              type: String,
+              required: true,
+            },
+            subjectCode: String,
+            faculty: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: 'User',
+            },
+            facultyName: String,
+            startTime: {
+              type: String,
+              required: true, // Format: "09:00"
+            },
+            endTime: {
+              type: String,
+              required: true, // Format: "10:00"
+            },
+            room: String,
+            building: String,
+            type: {
+              type: String,
+              enum: ['lecture', 'lab', 'tutorial', 'practical', 'seminar', 'other'],
+              default: 'lecture',
+            },
+          },
+        ],
       },
-      subjectCode: String,
-      faculty: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-      },
-      startTime: {
-        type: String,
-        required: true // Format: "09:00"
-      },
-      endTime: {
-        type: String,
-        required: true // Format: "10:00"
-      },
-      room: String,
-      building: String,
-      type: {
-        type: String,
-        enum: ['lecture', 'lab', 'tutorial', 'practical'],
-        default: 'lecture'
-      }
-    }]
-  }],
-  
-  isActive: {
-    type: Boolean,
-    default: true
+    ],
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
   }
-}, {
-  timestamps: true
-});
+);
 
 // Indexes
 timetableSchema.index({ student: 1 });

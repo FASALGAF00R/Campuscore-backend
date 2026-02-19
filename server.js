@@ -64,7 +64,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/emergency-assist', emergencyAssistRoutes);
 app.use('/api/counseling', counselingRoutes);
 app.use('/api/study-pods', studyPodRoutes);
-app.use('/api/timetable', timetableRoutes);
+app.use('/api/timetables', timetableRoutes);
 app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff', staffRoutes);
