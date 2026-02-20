@@ -211,13 +211,8 @@ export const adminLoginRequest = async (req, res) => {
       success: true,
       message: 'Admin authenticated successfully',
       data: {
-        user: {
-          id: user._id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          role: user.role,
-        },
+        user: user.toObject(),
+
         accessToken,
         refreshToken,
       },

@@ -142,6 +142,14 @@ export const registerForEvent = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Event is full' });
     }
 
+    // Check if event has already started
+    if (new Date() > new Date(event.startDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Registration failed: This event has already started or concluded.',
+      });
+    }
+
     event.registeredParticipants.push(req.user._id);
     await event.save();
 

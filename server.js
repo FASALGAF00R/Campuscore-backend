@@ -21,6 +21,8 @@ import studyMaterialRoutes from './routes/studyMaterials.js';
 import adminRoutes from './routes/admin.js';
 import staffRoutes from './routes/staff.js';
 import helpRequestRoutes from './routes/helpRequest.js';
+import facultyRoutes from './routes/faculty.js';
+import groupRoutes from './routes/groups.js';
 
 // Load environment variables
 dotenv.config();
@@ -69,6 +71,8 @@ app.use('/api/study-materials', studyMaterialRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/help-requests', helpRequestRoutes);
+app.use('/api/faculty', facultyRoutes);
+app.use('/api/groups', groupRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

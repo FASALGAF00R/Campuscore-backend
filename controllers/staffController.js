@@ -9,7 +9,7 @@ export const getPublicStaff = async (req, res) => {
       isVerified: true,
       isApproved: true,
     })
-      .select('firstName lastName email category bio availability phone')
+      .select('firstName lastName email category bio availability phone avatar')
       .sort({ firstName: 1 });
 
     res.status(200).json({ success: true, data: { staff } });

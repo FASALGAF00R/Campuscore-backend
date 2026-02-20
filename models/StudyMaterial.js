@@ -19,24 +19,33 @@ const studyMaterialSchema = new mongoose.Schema(
       required: true,
     },
     semester: Number,
+    resourceType: {
+      type: String,
+      enum: ['video', 'document', 'link', 'mixed'],
+      default: 'document',
+    },
+    videoUrl: String,
+    externalLinks: [
+      {
+        title: String,
+        url: String,
+        description: String,
+      },
+    ],
 
     // File details
-    filename: {
-      type: String,
-      required: true,
-    },
-    filePath: {
-      type: String,
-      required: true,
-    },
-    fileSize: {
-      type: Number,
-      required: true,
-    },
-    mimeType: {
-      type: String,
-      required: true,
-    },
+    filename: String,
+    filePath: String,
+    fileSize: Number,
+    mimeType: String,
+    attachments: [
+      {
+        filename: String,
+        path: String,
+        size: Number,
+        mimetype: String,
+      },
+    ],
 
     // Uploaded by
     uploadedBy: {

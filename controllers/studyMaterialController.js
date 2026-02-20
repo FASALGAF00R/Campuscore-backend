@@ -9,33 +9,60 @@ import fs from 'fs';
  */
 export const uploadMaterial = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded',
-      });
-    }
-
-    const { title, description, subject, department, semester, category, tags } = req.body;
-
-    const material = await StudyMaterial.create({
+    const {
       title,
       description,
       subject,
       department,
       semester,
       category,
+      tags,
+      resourceType,
+      videoUrl,
+      externalLinks,
+      podId,
+    } = req.body;
+
+    const attachments = (req.files || []).map((file) => ({
+      filename: file.originalname,
+      path: file.path,
+      size: file.size,
+      mimetype: file.mimetype,
+    }));
+
+    const updateData = {
+      title,
+      description,
+      subject,
+      department,
+      semester: semester ? parseInt(semester) : undefined,
+      category,
+      resourceType: resourceType || 'document',
+      videoUrl,
       tags: tags ? tags.split(',').map((tag) => tag.trim()) : [],
       uploadedBy: req.user._id,
       uploaderRole: req.user.role,
-      file: {
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        path: req.file.path,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-      },
-    });
+      podId,
+      attachments,
+    };
+
+    if (externalLinks) {
+      try {
+        updateData.externalLinks = JSON.parse(externalLinks);
+      } catch (e) {
+        console.warn('Failed to parse externalLinks:', e);
+      }
+    }
+
+    // Main file mapping for backward compatibility
+    if (attachments.length > 0) {
+      updateData.filename = attachments[0].filename;
+      updateData.filePath = attachments[0].path;
+      updateData.fileSize = attachments[0].size;
+      updateData.mimeType = attachments[0].mimetype;
+    }
+
+    const material = await StudyMaterial.create(updateData);
 
     await material.populate('uploadedBy', 'firstName lastName email role');
 
@@ -46,9 +73,13 @@ export const uploadMaterial = async (req, res) => {
     });
   } catch (error) {
     console.error('Upload material error:', error);
-    // Delete uploaded file if database save fails
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
+    // Delete uploaded files if database save fails
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
     }
     res.status(500).json({
       success: false,
@@ -140,7 +171,8 @@ export const getMaterial = async (req, res) => {
  */
 export const downloadMaterial = async (req, res) => {
   try {
-    const material = await StudyMaterial.findById(req.params.id);
+    const { id, fileIndex = 0 } = req.params;
+    const material = await StudyMaterial.findById(id);
 
     if (!material) {
       return res.status(404).json({
@@ -149,8 +181,23 @@ export const downloadMaterial = async (req, res) => {
       });
     }
 
-    // Check if file exists
-    if (!fs.existsSync(material.file.path)) {
+    let filePath, originalName;
+
+    if (material.attachments && material.attachments.length > 0) {
+      const index = parseInt(fileIndex);
+      if (index >= 0 && index < material.attachments.length) {
+        filePath = material.attachments[index].path;
+        originalName = material.attachments[index].filename;
+      }
+    }
+
+    // Fallback to legacy fields if attachments not found or index invalid
+    if (!filePath) {
+      filePath = material.filePath;
+      originalName = material.filename;
+    }
+
+    if (!filePath || !fs.existsSync(filePath)) {
       return res.status(404).json({
         success: false,
         message: 'File not found on server',
@@ -161,8 +208,7 @@ export const downloadMaterial = async (req, res) => {
     material.downloads += 1;
     await material.save();
 
-    // Send file
-    res.download(material.file.path, material.file.originalName);
+    res.download(filePath, originalName);
   } catch (error) {
     console.error('Download material error:', error);
     res.status(500).json({
@@ -248,9 +294,16 @@ export const deleteMaterial = async (req, res) => {
       });
     }
 
-    // Delete file from filesystem
-    if (fs.existsSync(material.file.path)) {
-      fs.unlinkSync(material.file.path);
+    // Delete all attachments from filesystem
+    if (material.attachments && material.attachments.length > 0) {
+      material.attachments.forEach((file) => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+    } else if (material.filePath && fs.existsSync(material.filePath)) {
+      // Fallback for legacy single file
+      fs.unlinkSync(material.filePath);
     }
 
     await material.deleteOne();
@@ -264,6 +317,110 @@ export const deleteMaterial = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete material',
+    });
+  }
+};
+
+/**
+ * @desc    Update study material
+ * @route   PUT /api/study-materials/:id
+ * @access  Private (Owner, Admin)
+ */
+export const updateMaterial = async (req, res) => {
+  try {
+    let material = await StudyMaterial.findById(req.params.id);
+
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        message: 'Material not found',
+      });
+    }
+
+    // Check authorization
+    const isOwner = material.uploadedBy.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this material',
+      });
+    }
+
+    const {
+      title,
+      description,
+      subject,
+      department,
+      semester,
+      category,
+      tags,
+      resourceType,
+      videoUrl,
+      externalLinks,
+    } = req.body;
+
+    const updateData = {
+      title: title || material.title,
+      description: description || material.description,
+      subject: subject || material.subject,
+      department: department || material.department,
+      semester: semester ? parseInt(semester) : material.semester,
+      category: category || material.category,
+      resourceType: resourceType || material.resourceType,
+      videoUrl: videoUrl !== undefined ? videoUrl : material.videoUrl,
+      tags: tags ? tags.split(',').map((tag) => tag.trim()) : material.tags,
+    };
+
+    if (externalLinks) {
+      try {
+        updateData.externalLinks = JSON.parse(externalLinks);
+      } catch (e) {
+        console.warn('Failed to parse externalLinks:', e);
+      }
+    }
+
+    // Handle new file uploads
+    if (req.files && req.files.length > 0) {
+      // Delete old files
+      if (material.attachments && material.attachments.length > 0) {
+        material.attachments.forEach((file) => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+      }
+
+      const attachments = req.files.map((file) => ({
+        filename: file.originalname,
+        path: file.path,
+        size: file.size,
+        mimetype: file.mimetype,
+      }));
+
+      updateData.attachments = attachments;
+      updateData.filename = attachments[0].filename;
+      updateData.filePath = attachments[0].path;
+      updateData.fileSize = attachments[0].size;
+      updateData.mimeType = attachments[0].mimetype;
+    }
+
+    material = await StudyMaterial.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate('uploadedBy', 'firstName lastName role');
+
+    res.status(200).json({
+      success: true,
+      message: 'Material updated successfully',
+      data: { material },
+    });
+  } catch (error) {
+    console.error('Update material error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update material',
     });
   }
 };

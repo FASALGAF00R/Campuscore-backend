@@ -46,16 +46,7 @@ const userSchema = new mongoose.Schema(
     designation: String,
 
     // Counselor specific fields
-    specialization: {
-      type: String,
-      enum: [
-        'Academic Issues',
-        'Career Guidance',
-        'Mental Health',
-        'Placement Support',
-        'Personal Issues',
-      ],
-    },
+    specialization: String,
     experience: Number, // Years of Experience
     qualification: String,
     bio: String, // Short Bio / About

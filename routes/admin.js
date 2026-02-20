@@ -36,7 +36,12 @@ router.get(
   authorize('admin', 'counselor', 'staff', 'faculty'),
   getAllStudents
 );
-router.get('/teachers', protect, authorize('admin', 'counselor', 'staff'), getAllTeachers);
+router.get(
+  '/teachers',
+  protect,
+  authorize('admin', 'counselor', 'staff', 'faculty'),
+  getAllTeachers
+);
 router.get('/counselors', protect, authorize('admin', 'faculty'), getAllCounselors);
 router.get('/staff', protect, authorize('admin', 'faculty'), getAllStaff);
 router.get('/sos', protect, authorize('admin', 'counselor', 'staff'), getAllSOSAlerts);

@@ -268,7 +268,7 @@ export const getPublicCounselors = async (req, res) => {
       isApproved: true,
     })
       .select(
-        'firstName lastName email qualification specialization experience bio availability counselingMode maxStudentsPerDay'
+        'firstName lastName email qualification specialization experience bio availability counselingMode maxStudentsPerDay avatar phone'
       )
       .sort({ firstName: 1 });
 

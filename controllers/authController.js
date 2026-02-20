@@ -325,6 +325,10 @@ export const updateProfile = async (req, res) => {
       qualification,
       experience,
       specialization,
+      designation,
+      category,
+      counselingMode,
+      availability,
     } = req.body;
 
     const user = await User.findById(req.user._id);
@@ -343,6 +347,10 @@ export const updateProfile = async (req, res) => {
     if (qualification) user.qualification = qualification;
     if (experience) user.experience = experience;
     if (specialization) user.specialization = specialization;
+    if (designation) user.designation = designation;
+    if (category) user.category = category;
+    if (counselingMode) user.counselingMode = counselingMode;
+    if (availability) user.availability = availability;
 
     // Handle avatar upload
     if (req.file) {
