@@ -182,6 +182,7 @@ export const getGroupChatHistory = async (req, res) => {
     // Verify membership and fetch group details with members populated
     const group = await GroupChat.findOne({ _id: groupId, members: req.user._id })
       .populate('members', 'firstName lastName avatar role')
+      .populate('creator', 'firstName lastName')
       .lean();
 
     if (!group) {
@@ -231,6 +232,92 @@ export const getDeptStudents = async (req, res) => {
     res.status(200).json({ success: true, data: { students } });
   } catch (error) {
     console.error('[facultyController] getDeptStudents:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * PUT /api/faculty/groups/:groupId/members
+ * Add members to a group chat (Creator only).
+ */
+export const addGroupMembers = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { members } = req.body; // Array of IDs
+
+    if (!members || !Array.isArray(members)) {
+      return res.status(400).json({ success: false, message: 'Members list is required' });
+    }
+
+    const group = await GroupChat.findOne({ _id: groupId, creator: req.user._id });
+    if (!group) {
+      return res.status(403).json({ success: false, message: 'Only the creator can add members' });
+    }
+
+    // Add unique members
+    const newMembers = [...new Set([...group.members.map((m) => m.toString()), ...members])];
+    group.members = newMembers;
+    await group.save();
+
+    const populatedGroup = await GroupChat.findById(groupId)
+      .populate('members', 'firstName lastName avatar role')
+      .populate('creator', 'firstName lastName')
+      .lean();
+
+    res.status(200).json({ success: true, data: { group: populatedGroup } });
+  } catch (error) {
+    console.error('[facultyController] addGroupMembers:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * DELETE /api/faculty/groups/:groupId/members/:userId
+ * Remove a member from a group chat (Creator only).
+ */
+export const removeGroupMember = async (req, res) => {
+  try {
+    const { groupId, userId } = req.params;
+
+    const group = await GroupChat.findOne({ _id: groupId, creator: req.user._id });
+    if (!group) {
+      return res
+        .status(403)
+        .json({ success: false, message: 'Only the creator can remove members' });
+    }
+
+    if (userId === group.creator.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot remove the creator' });
+    }
+
+    group.members = group.members.filter((m) => m.toString() !== userId);
+    await group.save();
+
+    const populatedGroup = await GroupChat.findById(groupId)
+      .populate('members', 'firstName lastName avatar role')
+      .populate('creator', 'firstName lastName')
+      .lean();
+
+    res.status(200).json({ success: true, data: { group: populatedGroup } });
+  } catch (error) {
+    console.error('[facultyController] removeGroupMember:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/faculty/groups/upload
+ * Generic chat image upload. Returns relative path.
+ */
+export const uploadChatFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const relativePath = `/uploads/chat/${req.file.filename}`;
+    res.status(200).json({ success: true, data: { url: relativePath } });
+  } catch (error) {
+    console.error('[facultyController] uploadChatFile:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -8,6 +8,7 @@ const folders = [
   'uploads/materials',
   'uploads/profiles',
   'uploads/help-requests',
+  'uploads/chat',
 ];
 folders.forEach((folder) => {
   if (!fs.existsSync(folder)) {
@@ -27,6 +28,8 @@ const genericStorage = multer.diskStorage({
       cb(null, 'uploads/profiles');
     } else if (req.originalUrl.includes('/help-requests')) {
       cb(null, 'uploads/help-requests');
+    } else if (req.originalUrl.includes('/groups')) {
+      cb(null, 'uploads/chat');
     } else {
       cb(null, 'uploads');
     }

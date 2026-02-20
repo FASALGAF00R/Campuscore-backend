@@ -23,6 +23,14 @@ const groupMessageSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    messageType: {
+      type: String,
+      enum: ['text', 'image'],
+      default: 'text',
+    },
+    imageUrl: {
+      type: String,
+    },
   },
   {
     timestamps: true,

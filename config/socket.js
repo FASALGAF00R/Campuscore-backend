@@ -71,18 +71,24 @@ export const initializeSocket = (server) => {
      *
      * Saves the message to DB and broadcasts to everyone in the dept room.
      */
-    socket.on('faculty:dept-message', async ({ content, department }) => {
+    socket.on('faculty:dept-message', async ({ content, department, messageType, imageUrl }) => {
       // Both faculty and students can send to their own dept
 
       const dept = (department || socket.userDepartment || '').trim();
-      if (!dept || !content || !content.trim()) return;
+      const type = messageType || 'text';
+
+      if (!dept) return;
+      if (type === 'text' && (!content || !content.trim())) return;
+      if (type === 'image' && !imageUrl) return;
 
       try {
         // Persist to MongoDB
         const saved = await DeptMessage.create({
           department: dept,
           sender: socket.userId,
-          content: content.trim(),
+          content: type === 'image' ? 'Sent an image' : content.trim(),
+          messageType: type,
+          imageUrl: type === 'image' ? imageUrl : undefined,
         });
 
         // Build the payload with sender info (avoids a populate round-trip)
@@ -90,6 +96,8 @@ export const initializeSocket = (server) => {
           _id: saved._id.toString(),
           department: saved.department,
           content: saved.content,
+          messageType: saved.messageType,
+          imageUrl: saved.imageUrl,
           createdAt: saved.createdAt,
           sender: {
             _id: socket.userId,
@@ -165,24 +173,31 @@ export const initializeSocket = (server) => {
      * Event: faculty:group-message
      * Payload: { groupId: string, content: string }
      */
-    socket.on('faculty:group-message', async ({ groupId, content }) => {
-      if (!groupId || !content || !content.trim()) return;
+    socket.on('faculty:group-message', async ({ groupId, content, messageType, imageUrl }) => {
+      const type = messageType || 'text';
+      if (!groupId) return;
+      if (type === 'text' && (!content || !content.trim())) return;
+      if (type === 'image' && !imageUrl) return;
 
       try {
         // Verify membership (optional but good for security)
         const group = await GroupChat.findOne({ _id: groupId, members: socket.userId });
         if (!group) return;
 
+        const textContent = type === 'image' ? content?.trim() || 'Sent an image' : content.trim();
+
         const saved = await GroupMessage.create({
           group: groupId,
           sender: socket.userId,
-          content: content.trim(),
+          content: textContent,
+          messageType: type,
+          imageUrl: type === 'image' ? imageUrl : undefined,
         });
 
         // Update last message in GroupChat
         await GroupChat.findByIdAndUpdate(groupId, {
           lastMessage: {
-            content: saved.content,
+            content: type === 'image' ? '📷 Image' : saved.content,
             sender: socket.userId,
             sentAt: saved.createdAt,
           },
@@ -192,6 +207,8 @@ export const initializeSocket = (server) => {
           _id: saved._id.toString(),
           group: groupId,
           content: saved.content,
+          messageType: saved.messageType,
+          imageUrl: saved.imageUrl,
           createdAt: saved.createdAt,
           sender: {
             _id: socket.userId,
