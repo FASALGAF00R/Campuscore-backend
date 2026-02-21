@@ -10,69 +10,94 @@ import { getIO } from '../config/socket.js';
  */
 export const createSOSAlert = async (req, res) => {
   try {
-    const {
-      type,
-      description,
-      location,
-      priority
-    } = req.body;
+    const { type, description, location, priority } = req.body;
 
     // Create SOS alert
     const sosAlert = await SOSAlert.create({
       student: req.user._id,
-      type,
-      description,
-      location,
-      priority: priority || 'high' // Default to high priority
+      type: type || 'safety',
+      description: description || 'Immediate SOS broadcast triggered from student terminal.',
+      location: location || { address: 'Institutional Safety Grid' },
+      priority: priority || 'high',
     });
+
+    console.log(`[SOS] Created alert ${sosAlert._id} for student ${req.user._id}`);
 
     // Populate student details
     await sosAlert.populate('student', 'firstName lastName email studentId department');
 
+    if (!sosAlert.student) {
+      console.error(`[SOS] Failed to populate student for alert ${sosAlert._id}`);
+      throw new Error('Student information could not be retrieved');
+    }
+
     // Broadcast to all faculty and admin via Socket.IO
     try {
       const io = getIO();
-      io.to('faculty').to('admin').emit('sos:new-alert', {
-        alert: sosAlert,
-        message: `🆘 New ${type} alert from ${sosAlert.student.firstName} ${sosAlert.student.lastName}`
-      });
+      // Notify all relevant responder roles
+      io.to('faculty')
+        .to('admin')
+        .to('counselor')
+        .to('staff')
+        .emit('sos:new-alert', {
+          alert: sosAlert,
+          message: `🆘 New ${type} alert from ${sosAlert.student?.firstName || 'A student'} ${sosAlert.student?.lastName || ''}`,
+        });
+      console.log(`[SOS] Broadcasted alert ${sosAlert._id} to emergency rooms via Socket.IO`);
     } catch (socketError) {
-      console.error('Socket.IO broadcast error:', socketError);
+      console.error('[SOS] Socket.IO broadcast error (non-fatal):', socketError.message);
       // Continue even if socket fails
     }
 
-    // Create notifications for all faculty and admin
-    const facultyAndAdmin = await User.find({
-      role: { $in: ['faculty', 'admin'] },
-      isActive: true
-    });
+    // Create notifications for all faculty and admin (Non-blocking)
+    try {
+      const facultyAndAdmin = await User.find({
+        role: { $in: ['faculty', 'admin'] },
+        isActive: true,
+      });
 
-    const notifications = facultyAndAdmin.map(user => ({
-      recipient: user._id,
-      type: 'sos-alert',
-      title: `🆘 SOS Alert: ${type}`,
-      message: `${sosAlert.student.firstName} ${sosAlert.student.lastName} needs immediate assistance`,
-      relatedEntity: {
-        model: 'SOSAlert',
-        id: sosAlert._id
-      },
-      actionUrl: `/sos/${sosAlert._id}`,
-      priority: sosAlert.priority,
-      icon: '🆘'
-    }));
+      console.log(`[SOS] Found ${facultyAndAdmin.length} faculty/admin to notify`);
 
-    await Notification.insertMany(notifications);
+      // Normalize priority for Notification model
+      let notificationPriority = sosAlert.priority;
+      if (notificationPriority === 'critical') notificationPriority = 'urgent';
+
+      const notifications = facultyAndAdmin.map((user) => ({
+        recipient: user._id,
+        type: 'sos-alert',
+        title: `🆘 SOS Alert: ${type}`,
+        message: `${sosAlert.student?.firstName || 'A student'} ${sosAlert.student?.lastName || ''} needs immediate assistance`,
+        relatedEntity: {
+          model: 'SOSAlert',
+          id: sosAlert._id,
+        },
+        actionUrl: `/sos/${sosAlert._id}`,
+        priority: ['low', 'medium', 'high', 'urgent'].includes(notificationPriority)
+          ? notificationPriority
+          : 'high',
+        icon: '🆘',
+      }));
+
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+        console.log(
+          `[SOS] Created ${notifications.length} notifications for alert ${sosAlert._id}`
+        );
+      }
+    } catch (notifError) {
+      console.error('[SOS] Notification creation error (non-fatal):', notifError);
+    }
 
     res.status(201).json({
       success: true,
       message: 'SOS alert created successfully. Help is on the way!',
-      data: { alert: sosAlert }
+      data: { alert: sosAlert },
     });
   } catch (error) {
-    console.error('Create SOS alert error:', error);
+    console.error('[SOS] Create SOS alert error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to create SOS alert'
+      message: error.message || 'Failed to create SOS alert',
     });
   }
 };
@@ -111,15 +136,15 @@ export const getAllSOSAlerts = async (req, res) => {
         pagination: {
           total,
           page: parseInt(page),
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
     console.error('Get SOS alerts error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch SOS alerts'
+      message: 'Failed to fetch SOS alerts',
     });
   }
 };
@@ -139,7 +164,7 @@ export const getSOSAlert = async (req, res) => {
     if (!alert) {
       return res.status(404).json({
         success: false,
-        message: 'SOS alert not found'
+        message: 'SOS alert not found',
       });
     }
 
@@ -150,19 +175,19 @@ export const getSOSAlert = async (req, res) => {
     if (!isAuthorized) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to view this alert'
+        message: 'Not authorized to view this alert',
       });
     }
 
     res.status(200).json({
       success: true,
-      data: { alert }
+      data: { alert },
     });
   } catch (error) {
     console.error('Get SOS alert error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch SOS alert'
+      message: 'Failed to fetch SOS alert',
     });
   }
 };
@@ -181,13 +206,13 @@ export const getMySOSAlerts = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { alerts }
+      data: { alerts },
     });
   } catch (error) {
     console.error('Get my SOS alerts error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch your alerts'
+      message: 'Failed to fetch your alerts',
     });
   }
 };
@@ -206,12 +231,12 @@ export const updateSOSStatus = async (req, res) => {
     if (!alert) {
       return res.status(404).json({
         success: false,
-        message: 'SOS alert not found'
+        message: 'SOS alert not found',
       });
     }
 
     alert.status = status;
-    
+
     if (status === 'resolved') {
       alert.resolvedAt = Date.now();
       alert.resolutionNotes = resolutionNotes;
@@ -227,7 +252,7 @@ export const updateSOSStatus = async (req, res) => {
       io.to(`user:${alert.student._id}`).emit('sos:status-update', {
         alertId: alert._id,
         status: alert.status,
-        message: `Your SOS alert status updated to: ${status}`
+        message: `Your SOS alert status updated to: ${status}`,
       });
     } catch (socketError) {
       console.error('Socket.IO error:', socketError);
@@ -241,21 +266,21 @@ export const updateSOSStatus = async (req, res) => {
       message: `Your alert status has been updated to ${status}`,
       relatedEntity: {
         model: 'SOSAlert',
-        id: alert._id
+        id: alert._id,
       },
-      priority: 'high'
+      priority: 'high',
     });
 
     res.status(200).json({
       success: true,
       message: 'SOS alert status updated',
-      data: { alert }
+      data: { alert },
     });
   } catch (error) {
     console.error('Update SOS status error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update alert status'
+      message: 'Failed to update alert status',
     });
   }
 };
@@ -274,7 +299,7 @@ export const assignSOSAlert = async (req, res) => {
     if (!alert) {
       return res.status(404).json({
         success: false,
-        message: 'SOS alert not found'
+        message: 'SOS alert not found',
       });
     }
 
@@ -283,7 +308,7 @@ export const assignSOSAlert = async (req, res) => {
     if (!assignedUser || !['faculty', 'admin'].includes(assignedUser.role)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid user for assignment'
+        message: 'Invalid user for assignment',
       });
     }
 
@@ -299,7 +324,7 @@ export const assignSOSAlert = async (req, res) => {
       const io = getIO();
       io.to(`user:${assignedToId}`).emit('sos:assigned', {
         alert,
-        message: `You've been assigned to handle an SOS alert`
+        message: `You've been assigned to handle an SOS alert`,
       });
     } catch (socketError) {
       console.error('Socket.IO error:', socketError);
@@ -313,21 +338,21 @@ export const assignSOSAlert = async (req, res) => {
       message: `You've been assigned to handle ${alert.student.firstName}'s SOS alert`,
       relatedEntity: {
         model: 'SOSAlert',
-        id: alert._id
+        id: alert._id,
       },
-      priority: 'urgent'
+      priority: 'urgent',
     });
 
     res.status(200).json({
       success: true,
       message: 'SOS alert assigned successfully',
-      data: { alert }
+      data: { alert },
     });
   } catch (error) {
     console.error('Assign SOS alert error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to assign alert'
+      message: 'Failed to assign alert',
     });
   }
 };
@@ -346,13 +371,13 @@ export const respondToSOS = async (req, res) => {
     if (!alert) {
       return res.status(404).json({
         success: false,
-        message: 'SOS alert not found'
+        message: 'SOS alert not found',
       });
     }
 
     alert.responses.push({
       responder: req.user._id,
-      message
+      message,
     });
 
     if (alert.status === 'pending') {
@@ -368,7 +393,7 @@ export const respondToSOS = async (req, res) => {
       const io = getIO();
       io.to(`user:${alert.student._id}`).emit('sos:response', {
         alertId: alert._id,
-        response: alert.responses[alert.responses.length - 1]
+        response: alert.responses[alert.responses.length - 1],
       });
     } catch (socketError) {
       console.error('Socket.IO error:', socketError);
@@ -377,13 +402,13 @@ export const respondToSOS = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Response added successfully',
-      data: { alert }
+      data: { alert },
     });
   } catch (error) {
     console.error('Respond to SOS error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to add response'
+      message: 'Failed to add response',
     });
   }
 };
@@ -402,18 +427,18 @@ export const getSOSStats = async (req, res) => {
       {
         $group: {
           _id: '$type',
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     const byPriority = await SOSAlert.aggregate([
       {
         $group: {
           _id: '$priority',
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     res.status(200).json({
@@ -423,14 +448,14 @@ export const getSOSStats = async (req, res) => {
         pending,
         resolved,
         byType,
-        byPriority
-      }
+        byPriority,
+      },
     });
   } catch (error) {
     console.error('Get SOS stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch statistics'
+      message: 'Failed to fetch statistics',
     });
   }
 };
