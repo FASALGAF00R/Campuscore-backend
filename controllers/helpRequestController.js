@@ -1,4 +1,5 @@
 import HelpRequest from '../models/HelpRequest.js';
+import Notification from '../models/Notification.js';
 
 // Create Help Request
 export const createHelpRequest = async (req, res) => {
@@ -116,6 +117,28 @@ export const updateRequestStatus = async (req, res) => {
     if (req.body.staffMessage) request.staffMessage = req.body.staffMessage;
     if (req.body.staffContact) request.staffContact = req.body.staffContact;
     await request.save();
+
+    // Notify student
+    try {
+      let notificationMessage = `Your help request status is now: ${status}`;
+      if (status === 'Rejected' && req.body.staffMessage) {
+        notificationMessage = `Your help request was rejected. Reason: ${req.body.staffMessage}`;
+      } else if (status === 'In Progress') {
+        notificationMessage = `Your help request is now being processed by ${req.user.firstName}.`;
+      } else if (status === 'Resolved') {
+        notificationMessage = `Your help request has been resolved. Please check the portal for details.`;
+      }
+
+      await Notification.create({
+        recipient: request.student,
+        type: 'help-request',
+        title: `Help Request: ${status}`,
+        message: notificationMessage,
+        relatedEntity: { model: 'HelpRequest', id: request._id },
+      });
+    } catch (notifError) {
+      console.error('[NOTIF_ERROR] Failed to notify student:', notifError);
+    }
 
     res.status(200).json({
       success: true,

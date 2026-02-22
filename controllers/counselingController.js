@@ -17,6 +17,7 @@ export const createCounselingRequest = async (req, res) => {
       preferredCounselor,
       hadPreviousCounseling,
       preferredSlot,
+      preferredDate,
     } = req.body;
 
     const request = await CounselingRequest.create({
@@ -30,6 +31,7 @@ export const createCounselingRequest = async (req, res) => {
       preferredCounselor,
       hadPreviousCounseling: hadPreviousCounseling || false,
       preferredSlot,
+      preferredDate,
     });
 
     // Broadcast to counselors
@@ -80,7 +82,7 @@ export const getMyCounselingRequests = async (req, res) => {
     const requests = await CounselingRequest.find({ student: req.user._id })
       .populate('counselor', 'firstName lastName email specialization qualification avatar')
       .populate('preferredCounselor', 'firstName lastName')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, data: { requests } });
   } catch (error) {
@@ -183,11 +185,18 @@ export const manageRequest = async (req, res) => {
 
     // Notify student if status changed or session details updated
     if (status || assignedSlot || location || meetingLink || counselorResponse) {
+      let notificationMessage = `Your counseling request status is now: ${status || request.status}`;
+      if (status === 'declined' && declineReason) {
+        notificationMessage = `Your counseling request was declined. Reason: ${declineReason}`;
+      } else if (status === 'accepted') {
+        notificationMessage = `Your counseling request has been accepted. Check your dashboard for appointment details.`;
+      }
+
       await Notification.create({
         recipient: request.student,
         type: 'counseling-request',
-        title: `Counseling Request Updated`,
-        message: `Your counseling request status is now: ${status || request.status}`,
+        title: status === 'declined' ? 'Counseling Request Declined' : 'Counseling Request Updated',
+        message: notificationMessage,
         relatedEntity: { model: 'CounselingRequest', id: request._id },
       });
     }
